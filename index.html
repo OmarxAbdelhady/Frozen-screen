@@ -131,6 +131,11 @@
             text-align: center;
             z-index: 10;
             transition: all 0.3s ease;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+            min-width: 200px;
         }
 
         .timer-display {
@@ -150,7 +155,7 @@
         }
 
         .time-settings input {
-            width: 50px;
+            width: 60px;
             padding: 4px;
             text-align: center;
             background-color: rgba(255, 255, 255, 0.15);
@@ -158,6 +163,11 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 4px;
             font-size: 0.9rem;
+        }
+
+        .time-settings label {
+            font-size: 0.8rem;
+            margin-top: 2px;
         }
 
         .pomodoro-controls {
@@ -204,6 +214,10 @@
             text-align: center;
             z-index: 10;
             transition: all 0.3s ease;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
         }
 
         .clock-display {
@@ -330,9 +344,15 @@
         <div class="timer-display" id="pomodoro-timer">25:00</div>
         <div class="time-settings">
             <div>
-                <input type="number" id="minutes-input" min="1" max="60" value="25">
+                <label for="hours-input">ساعة</label>
+                <input type="number" id="hours-input" min="0" max="23" value="0">
             </div>
             <div>
+                <label for="minutes-input">دقيقة</label>
+                <input type="number" id="minutes-input" min="0" max="59" value="25">
+            </div>
+            <div>
+                <label for="seconds-input">ثانية</label>
                 <input type="number" id="seconds-input" min="0" max="59" value="0">
             </div>
         </div>
@@ -358,6 +378,7 @@
         const alarmSound = document.getElementById('alarm-sound');
         
         const pomodoroTimer = document.getElementById('pomodoro-timer');
+        const hoursInput = document.getElementById('hours-input');
         const minutesInput = document.getElementById('minutes-input');
         const secondsInput = document.getElementById('seconds-input');
         const startPomodoroBtn = document.getElementById('start-pomodoro');
@@ -396,14 +417,42 @@
         
         // تحديث وقت البومودورو من المدخلات
         function updatePomodoroTimeFromInputs() {
+            const hours = parseInt(hoursInput.value) || 0;
             const minutes = parseInt(minutesInput.value) || 0;
             const seconds = parseInt(secondsInput.value) || 0;
-            pomodoroTime = minutes * 60 + seconds;
+            
+            // حساب الوقت الإجمالي بالثواني
+            pomodoroTime = hours * 3600 + minutes * 60 + seconds;
+            
+            // التحقق من أن الوقت أكبر من صفر
+            if (pomodoroTime <= 0) {
+                pomodoroTime = 1; // الحد الأدنى هو ثانية واحدة
+                secondsInput.value = 1;
+            }
+            
             updatePomodoroDisplay();
         }
         
-        minutesInput.addEventListener('change', updatePomodoroTimeFromInputs);
-        secondsInput.addEventListener('change', updatePomodoroTimeFromInputs);
+        hoursInput.addEventListener('change', function() {
+            // التأكد من أن القيمة بين 0 و23
+            if (hoursInput.value < 0) hoursInput.value = 0;
+            if (hoursInput.value > 23) hoursInput.value = 23;
+            updatePomodoroTimeFromInputs();
+        });
+        
+        minutesInput.addEventListener('change', function() {
+            // التأكد من أن القيمة بين 0 و59
+            if (minutesInput.value < 0) minutesInput.value = 0;
+            if (minutesInput.value > 59) minutesInput.value = 59;
+            updatePomodoroTimeFromInputs();
+        });
+        
+        secondsInput.addEventListener('change', function() {
+            // التأكد من أن القيمة بين 0 و59
+            if (secondsInput.value < 0) secondsInput.value = 0;
+            if (secondsInput.value > 59) secondsInput.value = 59;
+            updatePomodoroTimeFromInputs();
+        });
         
         // وظائف البومودورو
         function startPomodoro() {
@@ -412,51 +461,82 @@
                 isPomodoroPaused = false;
                 startPomodoroBtn.disabled = true;
                 pausePomodoroBtn.disabled = false;
+                hoursInput.disabled = true;
                 minutesInput.disabled = true;
                 secondsInput.disabled = true;
                 pomodoroTimer.classList.add('pomodoro-active');
                 
-                pomodoroInterval = setInterval(function() {
-                    if (pomodoroTime > 0) {
-                        pomodoroTime--;
-                        updatePomodoroDisplay();
-                    } else {
-                        clearInterval(pomodoroInterval);
-                        isPomodoroRunning = false;
-                        startPomodoroBtn.disabled = false;
-                        pausePomodoroBtn.disabled = true;
-                        minutesInput.disabled = false;
-                        secondsInput.disabled = false;
-                        pomodoroTimer.classList.remove('pomodoro-active');
+                // استخدام requestAnimationFrame لتحديث المؤقت بدقة
+                let lastTime = Date.now();
+                
+                function updateTimer() {
+                    if (!isPomodoroRunning || isPomodoroPaused) return;
+                    
+                    const currentTime = Date.now();
+                    const elapsed = Math.floor((currentTime - lastTime) / 1000);
+                    
+                    if (elapsed >= 1) {
+                        lastTime = currentTime;
                         
-                        // تشغيل صوت المنبه
-                        alarmSound.play();
-                        
-                        alert('انتهى وقت البومودورو! خذ استراحة قصيرة.');
+                        if (pomodoroTime > 0) {
+                            pomodoroTime--;
+                            updatePomodoroDisplay();
+                        } else {
+                            clearPomodoroInterval();
+                            isPomodoroRunning = false;
+                            startPomodoroBtn.disabled = false;
+                            pausePomodoroBtn.disabled = true;
+                            hoursInput.disabled = false;
+                            minutesInput.disabled = false;
+                            secondsInput.disabled = false;
+                            pomodoroTimer.classList.remove('pomodoro-active');
+                            
+                            // تشغيل صوت المنبه
+                            alarmSound.play();
+                            
+                            alert('انتهى وقت البومودورو! خذ استراحة قصيرة.');
+                            return;
+                        }
                     }
-                }, 1000);
+                    
+                    pomodoroInterval = requestAnimationFrame(updateTimer);
+                }
+                
+                function clearPomodoroInterval() {
+                    if (pomodoroInterval) {
+                        cancelAnimationFrame(pomodoroInterval);
+                        pomodoroInterval = null;
+                    }
+                }
+                
+                updateTimer();
             }
         }
         
         function pausePomodoro() {
             if (isPomodoroRunning && !isPomodoroPaused) {
-                clearInterval(pomodoroInterval);
                 isPomodoroPaused = true;
                 pausePomodoroBtn.textContent = 'متابعة';
             } else if (isPomodoroPaused) {
-                startPomodoro();
+                isPomodoroPaused = false;
                 pausePomodoroBtn.textContent = 'إيقاف';
+                startPomodoro();
             }
         }
         
         function resetPomodoro() {
-            clearInterval(pomodoroInterval);
+            if (pomodoroInterval) {
+                cancelAnimationFrame(pomodoroInterval);
+                pomodoroInterval = null;
+            }
+            
             updatePomodoroTimeFromInputs();
             isPomodoroRunning = false;
             isPomodoroPaused = false;
             startPomodoroBtn.disabled = false;
             pausePomodoroBtn.disabled = true;
             pausePomodoroBtn.textContent = 'إيقاف';
+            hoursInput.disabled = false;
             minutesInput.disabled = false;
             secondsInput.disabled = false;
             pomodoroTimer.classList.remove('pomodoro-active');
@@ -464,9 +544,15 @@
         }
         
         function updatePomodoroDisplay() {
-            const minutes = Math.floor(pomodoroTime / 60);
+            const hours = Math.floor(pomodoroTime / 3600);
+            const minutes = Math.floor((pomodoroTime % 3600) / 60);
             const seconds = pomodoroTime % 60;
-            pomodoroTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (hours > 0) {
+                pomodoroTimer.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                pomodoroTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
         }
         
         // أحداث البومودورو
